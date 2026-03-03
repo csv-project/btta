@@ -1,0 +1,931 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WordBlast — English Vocab Shooter</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --neon-blue: #00d4ff;
+      --neon-green: #39ff14;
+      --neon-pink: #ff2d78;
+      --neon-yellow: #ffe600;
+      --neon-purple: #bf5fff;
+      --neon-orange: #ff9500;
+      --dark: #050a14;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      overflow: hidden;
+      background: var(--dark);
+      color: white;
+      font-family: 'Share Tech Mono', monospace;
+      height: 100vh; width: 100vw;
+    }
+    #stars {
+      position: fixed; inset: 0;
+      background:
+        radial-gradient(ellipse at 20% 50%, rgba(0,80,160,0.12) 0%, transparent 60%),
+        radial-gradient(ellipse at 80% 20%, rgba(100,0,160,0.10) 0%, transparent 50%),
+        var(--dark);
+      z-index: 0;
+    }
+    #stars::before, #stars::after {
+      content: ''; position: absolute; inset: 0;
+      background-image:
+        radial-gradient(1px 1px at 20% 30%, rgba(255,255,255,0.7) 0%, transparent 100%),
+        radial-gradient(1px 1px at 40% 70%, rgba(255,255,255,0.5) 0%, transparent 100%),
+        radial-gradient(1px 1px at 60% 20%, rgba(255,255,255,0.6) 0%, transparent 100%),
+        radial-gradient(1px 1px at 80% 80%, rgba(255,255,255,0.4) 0%, transparent 100%),
+        radial-gradient(1px 1px at 10% 60%, rgba(255,255,255,0.5) 0%, transparent 100%),
+        radial-gradient(1px 1px at 90% 40%, rgba(255,255,255,0.6) 0%, transparent 100%),
+        radial-gradient(1.5px 1.5px at 35% 15%, rgba(0,212,255,0.6) 0%, transparent 100%),
+        radial-gradient(1.5px 1.5px at 75% 55%, rgba(191,95,255,0.5) 0%, transparent 100%);
+      background-size: 400px 400px;
+      animation: twinkle 4s infinite alternate;
+    }
+    #stars::after { background-size: 300px 500px; animation-delay: 2s; animation-duration: 6s; }
+    @keyframes twinkle { from { opacity: 0.6; } to { opacity: 1; } }
+
+    .grid-lines {
+      position: fixed; inset: 0; z-index: 0;
+      background-image:
+        linear-gradient(rgba(0,212,255,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,212,255,0.04) 1px, transparent 1px);
+      background-size: 60px 60px;
+      pointer-events: none;
+    }
+
+    #game { position: relative; width: 100vw; height: 100vh; z-index: 1; }
+    #fxCanvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
+
+    /* ── ENEMY CARDS ── */
+    .enemy {
+      position: absolute;
+      display: flex; flex-direction: column; align-items: center;
+    }
+    .enemy-card {
+      background: rgba(0,10,25,0.92);
+      border: 1.5px solid rgba(0,212,255,0.4);
+      border-radius: 10px;
+      padding: 6px 14px 8px;
+      min-width: 130px;
+      text-align: center;
+      position: relative;
+      box-shadow: 0 0 16px rgba(0,212,255,0.18), inset 0 0 8px rgba(0,212,255,0.06);
+    }
+    .enemy-card::before {
+      content: ''; position: absolute; top: -1px; left: 10%; right: 10%; height: 1px;
+      background: linear-gradient(90deg, transparent, var(--neon-blue), transparent);
+    }
+    .enemy-word {
+      font-family: 'Orbitron', monospace;
+      font-size: 15px; font-weight: 700;
+      color: #00d4ff; letter-spacing: 2px;
+      text-shadow: 0 0 10px rgba(0,212,255,0.8);
+      text-transform: uppercase;
+    }
+    .enemy-vi {
+      font-size: 11px;
+      color: rgba(255,210,80,0.85);
+      margin-top: 2px;
+      font-style: italic;
+    }
+    .enemy-meaning {
+      font-size: 10px;
+      color: rgba(255,255,255,0.4);
+      margin-top: 1px;
+      max-width: 140px;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .enemy-type-badge {
+      font-size: 9px; padding: 1px 6px; border-radius: 20px; margin-top: 3px;
+      display: inline-block; text-transform: uppercase; letter-spacing: 1px; font-weight: bold;
+    }
+    .badge-noun   { background: rgba(0,212,255,0.15); color: var(--neon-blue);   border: 1px solid rgba(0,212,255,0.3); }
+    .badge-verb   { background: rgba(57,255,20,0.15);  color: var(--neon-green);  border: 1px solid rgba(57,255,20,0.3); }
+    .badge-adj    { background: rgba(255,230,0,0.15);  color: var(--neon-yellow); border: 1px solid rgba(255,230,0,0.3); }
+    .badge-adv    { background: rgba(191,95,255,0.15); color: var(--neon-purple); border: 1px solid rgba(191,95,255,0.3); }
+    .badge-boss   { background: rgba(255,45,120,0.2);  color: var(--neon-pink);   border: 1px solid rgba(255,45,120,0.5); }
+
+    .boss .enemy-card {
+      border-color: rgba(255,45,120,0.7);
+      box-shadow: 0 0 30px rgba(255,45,120,0.35), 0 0 60px rgba(255,45,120,0.1);
+      min-width: 190px;
+    }
+    .boss .enemy-card::before { background: linear-gradient(90deg, transparent, var(--neon-pink), transparent); }
+    .boss .enemy-word { color: #ff2d78; font-size: 18px; text-shadow: 0 0 15px rgba(255,45,120,0.9); }
+    .boss .enemy-vi   { color: rgba(255,150,200,0.9); }
+
+    .hp-bar-wrap { width: 100%; height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; margin-top: 5px; overflow: hidden; }
+    .hp-bar { height: 100%; border-radius: 2px; }
+    .boss .hp-bar   { background: linear-gradient(90deg, #ff2d78, #ff88bb); }
+    .normal .hp-bar { background: linear-gradient(90deg, #00d4ff, #39ff14); }
+
+    .typed-prefix { color: var(--neon-green); text-shadow: 0 0 8px var(--neon-green); }
+
+    @keyframes hitFlash {
+      0%   { filter: brightness(8) saturate(0); transform: scale(1.3); }
+      100% { filter: brightness(1) saturate(1); transform: scale(1); }
+    }
+    .hit-flash { animation: hitFlash 0.15s ease-out forwards; }
+
+    /* ── BULLET ── */
+    .bullet {
+      position: absolute; width: 3px; height: 24px;
+      background: linear-gradient(to bottom, #fff, var(--neon-blue));
+      box-shadow: 0 0 12px var(--neon-blue), 0 0 4px #fff;
+      border-radius: 2px; z-index: 5;
+    }
+
+    /* ── PLAYER ── */
+    #player {
+      position: absolute; bottom: 70px; left: 50%;
+      transform: translateX(-50%);
+      width: 50px; height: 50px; z-index: 5;
+    }
+    #player svg { filter: drop-shadow(0 0 12px var(--neon-blue)); }
+    .engine-glow {
+      position: absolute; bottom: -12px; left: 50%;
+      transform: translateX(-50%);
+      width: 14px; height: 22px;
+      background: radial-gradient(ellipse, rgba(0,212,255,0.9) 0%, rgba(0,212,255,0.0) 80%);
+      border-radius: 50%;
+      animation: enginePulse 0.4s infinite alternate;
+    }
+    @keyframes enginePulse { from { height: 18px; opacity: 0.7; } to { height: 26px; opacity: 1; } }
+
+    /* ── INPUT ── */
+    #inputWrap {
+      position: absolute; bottom: 14px; left: 50%;
+      transform: translateX(-50%);
+      z-index: 20;
+    }
+    #playerInput {
+      padding: 10px 18px; font-size: 17px;
+      font-family: 'Orbitron', monospace;
+      width: 300px; text-align: center;
+      background: rgba(0,15,35,0.92);
+      border: 1.5px solid rgba(0,212,255,0.4);
+      color: var(--neon-blue); border-radius: 8px; outline: none;
+      letter-spacing: 2px; text-transform: uppercase;
+      caret-color: var(--neon-green);
+      box-shadow: 0 0 20px rgba(0,212,255,0.12);
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    #playerInput:focus { border-color: rgba(0,212,255,0.8); box-shadow: 0 0 30px rgba(0,212,255,0.25); }
+    #playerInput.match { border-color: rgba(57,255,20,0.9); box-shadow: 0 0 25px rgba(57,255,20,0.3); }
+
+    /* ── HUD ── */
+    #hud {
+      position: absolute; top: 0; left: 0; right: 0;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 18px;
+      background: linear-gradient(to bottom, rgba(0,5,15,0.9), transparent);
+      z-index: 20;
+    }
+    .hud-block { display: flex; flex-direction: column; align-items: center; }
+    .hud-label { font-size: 9px; color: rgba(255,255,255,0.35); letter-spacing: 2px; text-transform: uppercase; }
+    .hud-value { font-family: 'Orbitron', monospace; font-size: 18px; font-weight: 700; line-height: 1.1; }
+    #scoreVal { color: var(--neon-yellow); text-shadow: 0 0 10px rgba(255,230,0,0.7); }
+    #levelVal { color: var(--neon-blue);   text-shadow: 0 0 10px rgba(0,212,255,0.7); }
+    #multVal  { color: var(--neon-green);  text-shadow: 0 0 10px rgba(57,255,20,0.6); }
+    #healthBar { width: 160px; }
+    .health-label { font-size: 9px; color: rgba(255,255,255,0.35); letter-spacing: 2px; text-align: center; margin-bottom: 3px; }
+    .health-track { height: 10px; background: rgba(255,255,255,0.08); border-radius: 5px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1); }
+    #healthFill { height: 100%; width: 100%; background: linear-gradient(90deg, #39ff14, #00d4ff); border-radius: 5px; transition: width 0.3s, background 0.5s; box-shadow: 0 0 8px rgba(57,255,20,0.5); }
+
+    /* ── COMBO ── */
+    #comboText {
+      position: absolute; top: 70px; left: 50%; transform: translateX(-50%);
+      font-family: 'Orbitron', monospace; font-size: 22px; font-weight: 900;
+      color: var(--neon-green); text-shadow: 0 0 20px var(--neon-green);
+      opacity: 0; pointer-events: none; z-index: 20; transition: opacity 0.3s; letter-spacing: 4px;
+    }
+
+    /* ── WORD LEARNED TOAST (Vietnamese!) ── */
+    #wordLearnedToast {
+      position: absolute;
+      bottom: 130px; right: 18px;
+      width: 290px;
+      background: rgba(2,8,22,0.97);
+      border: 1px solid rgba(255,210,80,0.35);
+      border-left: 3px solid var(--neon-yellow);
+      border-radius: 10px;
+      padding: 12px 16px;
+      opacity: 0; z-index: 25; pointer-events: none;
+      transition: opacity 0.35s, transform 0.35s;
+      transform: translateX(20px);
+      box-shadow: 0 0 30px rgba(255,210,80,0.1), 0 4px 24px rgba(0,0,0,0.5);
+    }
+    #wordLearnedToast.show {
+      opacity: 1; transform: translateX(0);
+    }
+    .toast-header {
+      display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
+    }
+    .toast-badge {
+      font-size: 9px; padding: 2px 7px; border-radius: 20px;
+      text-transform: uppercase; letter-spacing: 1px; font-weight: bold;
+    }
+    .toast-en {
+      font-family: 'Orbitron', monospace;
+      font-size: 18px; font-weight: 900;
+      color: var(--neon-blue); letter-spacing: 3px;
+      text-transform: uppercase;
+      text-shadow: 0 0 12px rgba(0,212,255,0.6);
+    }
+    .toast-vi {
+      font-size: 15px; font-weight: bold;
+      color: var(--neon-yellow);
+      margin-bottom: 6px;
+      text-shadow: 0 0 8px rgba(255,230,0,0.5);
+    }
+    .toast-en-meaning {
+      font-size: 11px; color: rgba(255,255,255,0.5);
+      margin-bottom: 6px; font-style: italic;
+    }
+    .toast-divider { height: 1px; background: rgba(255,255,255,0.07); margin: 6px 0; }
+    .toast-example {
+      font-size: 11px; color: rgba(255,200,100,0.75);
+      font-style: italic; line-height: 1.5;
+    }
+    .toast-example .highlight { color: var(--neon-green); font-style: normal; font-weight: bold; }
+
+    /* ── FLOATING SCORE ── */
+    .float-score {
+      position: absolute;
+      font-family: 'Orbitron', monospace;
+      font-size: 20px; font-weight: 900;
+      pointer-events: none; z-index: 25;
+      animation: floatUp 0.9s ease-out forwards;
+    }
+    @keyframes floatUp {
+      0%   { opacity: 1; transform: translateY(0) scale(1); }
+      80%  { opacity: 0.8; transform: translateY(-55px) scale(1.15); }
+      100% { opacity: 0; transform: translateY(-75px) scale(0.9); }
+    }
+
+    /* ── VI POP (Vietnamese word pops near enemy) ── */
+    .vi-pop {
+      position: absolute;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 14px; font-weight: bold;
+      color: var(--neon-yellow);
+      text-shadow: 0 0 10px rgba(255,230,0,0.8);
+      pointer-events: none; z-index: 26;
+      white-space: nowrap;
+      animation: viFloat 1.4s ease-out forwards;
+    }
+    @keyframes viFloat {
+      0%   { opacity: 0;   transform: translateY(0) scale(0.7); }
+      15%  { opacity: 1;   transform: translateY(-10px) scale(1.1); }
+      70%  { opacity: 1;   transform: translateY(-40px) scale(1); }
+      100% { opacity: 0;   transform: translateY(-65px) scale(0.9); }
+    }
+
+    /* ── SCREENS ── */
+    .screen {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      z-index: 40; background: rgba(0,0,0,0.88); backdrop-filter: blur(4px);
+    }
+    #startScreen h1 {
+      font-family: 'Orbitron', monospace;
+      font-size: clamp(32px, 6vw, 64px); font-weight: 900; letter-spacing: 6px;
+      background: linear-gradient(135deg, var(--neon-blue), var(--neon-purple), var(--neon-pink));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      margin-bottom: 4px;
+    }
+    #startScreen .tagline {
+      color: rgba(255,255,255,0.4); letter-spacing: 3px; font-size: 11px;
+      margin-bottom: 30px; text-transform: uppercase; text-align: center;
+    }
+    .mode-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; max-width: 580px; width: 90%; margin-bottom: 24px; }
+    .mode-card {
+      background: rgba(0,15,35,0.8); border: 1.5px solid rgba(0,212,255,0.2);
+      border-radius: 14px; padding: 16px 18px; cursor: pointer;
+      transition: all 0.25s; text-align: left; position: relative; overflow: hidden;
+    }
+    .mode-card:hover { border-color: rgba(0,212,255,0.7); transform: translateY(-3px); box-shadow: 0 8px 30px rgba(0,212,255,0.2); }
+    .mode-card.selected { border-color: var(--neon-green); box-shadow: 0 0 20px rgba(57,255,20,0.3); }
+    .mode-icon { font-size: 26px; margin-bottom: 6px; }
+    .mode-name { font-family: 'Orbitron', monospace; font-size: 12px; font-weight: 700; color: var(--neon-blue); letter-spacing: 2px; text-transform: uppercase; }
+    .mode-desc { font-size: 11px; color: rgba(255,255,255,0.4); margin-top: 4px; line-height: 1.5; }
+    .diff-row { display: flex; gap: 12px; margin-bottom: 28px; }
+    .diff-btn {
+      font-family: 'Share Tech Mono', monospace; padding: 8px 22px;
+      border: 1.5px solid rgba(255,255,255,0.2); border-radius: 6px;
+      background: transparent; color: rgba(255,255,255,0.5);
+      cursor: pointer; font-size: 13px; letter-spacing: 2px; text-transform: uppercase; transition: all 0.2s;
+    }
+    .diff-btn:hover { border-color: rgba(255,255,255,0.5); color: white; }
+    .diff-btn.active { border-color: var(--neon-yellow); color: var(--neon-yellow); box-shadow: 0 0 12px rgba(255,230,0,0.2); }
+    .start-btn {
+      font-family: 'Orbitron', monospace; font-size: 16px; font-weight: 700;
+      padding: 14px 48px; border: 2px solid var(--neon-blue); border-radius: 8px;
+      background: rgba(0,212,255,0.08); color: var(--neon-blue); cursor: pointer;
+      letter-spacing: 4px; text-transform: uppercase; transition: all 0.25s;
+      box-shadow: 0 0 20px rgba(0,212,255,0.15);
+    }
+    .start-btn:hover { background: rgba(0,212,255,0.2); box-shadow: 0 0 40px rgba(0,212,255,0.4); transform: scale(1.04); }
+
+    #gameOverScreen h2 {
+      font-family: 'Orbitron', monospace; font-size: clamp(28px, 5vw, 52px); font-weight: 900;
+      color: var(--neon-pink); text-shadow: 0 0 30px rgba(255,45,120,0.8); letter-spacing: 6px; margin-bottom: 10px;
+    }
+    #finalScore { font-family: 'Orbitron', monospace; font-size: clamp(14px, 2.5vw, 26px); color: var(--neon-yellow); margin-bottom: 8px; text-align: center; }
+    #learnedList {
+      max-width: 520px; width: 90%; max-height: 220px; overflow-y: auto;
+      background: rgba(0,10,25,0.7); border: 1px solid rgba(0,212,255,0.2);
+      border-radius: 10px; padding: 12px 16px; margin: 14px 0 22px;
+      scrollbar-width: thin; scrollbar-color: rgba(0,212,255,0.3) transparent;
+    }
+    #learnedList h3 { font-size: 10px; letter-spacing: 3px; text-transform: uppercase; color: rgba(255,255,255,0.3); margin-bottom: 10px; }
+    .learned-item { margin-bottom: 7px; line-height: 1.5; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+    .lw { color: var(--neon-blue); font-family: 'Orbitron', monospace; font-size: 12px; text-transform: uppercase; }
+    .lv { color: var(--neon-yellow); font-size: 12px; font-weight: bold; }
+    .lm { color: rgba(255,255,255,0.45); font-size: 11px; font-style: italic; }
+
+    #levelUpBanner {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+      font-family: 'Orbitron', monospace; font-size: clamp(24px, 5vw, 52px); font-weight: 900;
+      color: var(--neon-yellow); text-shadow: 0 0 40px rgba(255,230,0,0.9);
+      letter-spacing: 8px; z-index: 30; opacity: 0; pointer-events: none; text-align: center;
+    }
+
+    @keyframes shake {
+      0%,100%{ transform:translate(0,0); }
+      10%{ transform:translate(-8px,6px); } 20%{ transform:translate(7px,-7px); }
+      30%{ transform:translate(-6px,8px); } 40%{ transform:translate(6px,-5px); }
+      50%{ transform:translate(-4px,3px); } 60%{ transform:translate(3px,-2px); }
+    }
+    @keyframes shakeBoss {
+      0%,100%{ transform:translate(0,0); }
+      8%{ transform:translate(-14px,10px) rotate(-1deg); } 16%{ transform:translate(13px,-12px) rotate(1deg); }
+      32%{ transform:translate(10px,-9px) rotate(.7deg); } 50%{ transform:translate(6px,-5px) rotate(.4deg); }
+    }
+    .screen-shake      { animation: shake 0.4s ease-out; }
+    .screen-shake-boss { animation: shakeBoss 0.6s ease-out; }
+  </style>
+</head>
+<body>
+  <div id="stars"></div>
+  <div class="grid-lines"></div>
+
+  <!-- START SCREEN -->
+  <div id="startScreen" class="screen">
+    <h1>WORDBLAST</h1>
+    <div class="tagline">Học tiếng Anh qua bắn súng · Master English Vocab</div>
+    <div class="mode-grid">
+      <div class="mode-card selected" data-mode="classic" onclick="selectMode(this,'classic')">
+        <div class="mode-icon">🚀</div>
+        <div class="mode-name">Classic</div>
+        <div class="mode-desc">Gõ từ tiếng Anh trên màn hình để bắn.</div>
+      </div>
+      <div class="mode-card" data-mode="meaning" onclick="selectMode(this,'meaning')">
+        <div class="mode-icon">🧠</div>
+        <div class="mode-name">Meaning Mode</div>
+        <div class="mode-desc">Thấy nghĩa tiếng Anh, gõ từ đúng để bắn.</div>
+      </div>
+      <div class="mode-card" data-mode="vietnamese" onclick="selectMode(this,'vietnamese')">
+        <div class="mode-icon">🇻🇳</div>
+        <div class="mode-name">Tiếng Việt</div>
+        <div class="mode-desc">Thấy nghĩa tiếng Việt, gõ từ tiếng Anh.</div>
+      </div>
+      <div class="mode-card" data-mode="scramble" onclick="selectMode(this,'scramble')">
+        <div class="mode-icon">🔀</div>
+        <div class="mode-name">Scramble</div>
+        <div class="mode-desc">Chữ cái bị xáo trộn — unscramble để bắn!</div>
+      </div>
+    </div>
+    <div class="diff-row">
+      <button class="diff-btn active" onclick="selectDiff(this,'easy')">Dễ</button>
+      <button class="diff-btn" onclick="selectDiff(this,'normal')">Thường</button>
+      <button class="diff-btn" onclick="selectDiff(this,'hard')">Khó</button>
+    </div>
+    <button class="start-btn" onclick="beginGame()">PHÓNG  ▶</button>
+  </div>
+
+  <!-- GAME OVER -->
+  <div id="gameOverScreen" class="screen" style="display:none;">
+    <h2>GAME OVER</h2>
+    <div id="finalScore"></div>
+    <div id="learnedList"><h3>📚 Từ vựng đã học</h3><div id="learnedItems"></div></div>
+    <button class="start-btn" onclick="location.reload()">CHƠI LẠI</button>
+  </div>
+
+  <div id="game">
+    <canvas id="fxCanvas"></canvas>
+    <div id="hud">
+      <div class="hud-block">
+        <span class="hud-label">Điểm</span>
+        <span class="hud-value" id="scoreVal">0</span>
+      </div>
+      <div id="healthBar">
+        <div class="health-label">SỨC KHỎE TÀU</div>
+        <div class="health-track"><div id="healthFill"></div></div>
+      </div>
+      <div class="hud-block">
+        <span class="hud-label">Level</span>
+        <span class="hud-value" id="levelVal">1</span>
+      </div>
+      <div class="hud-block">
+        <span class="hud-label">Combo ×</span>
+        <span class="hud-value" id="multVal">1</span>
+      </div>
+    </div>
+
+    <div id="comboText"></div>
+    <div id="levelUpBanner"></div>
+
+    <!-- Vietnamese toast popup -->
+    <div id="wordLearnedToast">
+      <div class="toast-header">
+        <span class="toast-badge" id="toastBadge"></span>
+      </div>
+      <div class="toast-en" id="toastEn"></div>
+      <div class="toast-vi" id="toastVi"></div>
+      <div class="toast-en-meaning" id="toastMeaning"></div>
+      <div class="toast-divider"></div>
+      <div class="toast-example" id="toastExample"></div>
+    </div>
+
+    <div id="player">
+      <svg viewBox="0 0 50 50" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <polygon points="25,2 38,42 25,36 12,42" fill="rgba(0,212,255,0.15)" stroke="#00d4ff" stroke-width="1.5"/>
+        <polygon points="25,8 34,38 25,32 16,38" fill="rgba(0,212,255,0.1)" stroke="rgba(0,212,255,0.5)" stroke-width="1"/>
+        <circle cx="25" cy="20" r="4" fill="rgba(0,212,255,0.8)" stroke="#00d4ff" stroke-width="1"/>
+        <line x1="12" y1="40" x2="8" y2="48" stroke="#00d4ff" stroke-width="1.5" opacity="0.5"/>
+        <line x1="38" y1="40" x2="42" y2="48" stroke="#00d4ff" stroke-width="1.5" opacity="0.5"/>
+      </svg>
+      <div class="engine-glow"></div>
+    </div>
+
+    <div id="inputWrap">
+      <input type="text" id="playerInput" placeholder="GÕ TỪ + ENTER" autocomplete="off" autocorrect="off" spellcheck="false"/>
+    </div>
+  </div>
+
+  <script>
+  // ──────────────────────────────────────────────────────────────
+  // VOCABULARY DATABASE — with Vietnamese meanings
+  // ──────────────────────────────────────────────────────────────
+  const VOCAB = [
+    // Adjectives
+    { word:"brave",      type:"adj",  vi:"dũng cảm",          meaning:"courageous; not afraid",                    example:"She was ___ enough to speak in front of 200 people." },
+    { word:"rapid",      type:"adj",  vi:"nhanh chóng",        meaning:"very fast or quick",                        example:"The ___ growth of the city surprised everyone." },
+    { word:"ancient",    type:"adj",  vi:"cổ đại",             meaning:"very old; from long ago",                   example:"They discovered an ___ temple in the jungle." },
+    { word:"vivid",      type:"adj",  vi:"sinh động",          meaning:"very bright; producing clear images",       example:"He had a ___ dream about flying." },
+    { word:"fragile",    type:"adj",  vi:"dễ vỡ",              meaning:"easily broken or damaged",                  example:"Handle this glass carefully — it's very ___." },
+    { word:"eager",      type:"adj",  vi:"háo hức",            meaning:"very enthusiastic and keen",                example:"She was ___ to start her new job." },
+    { word:"fierce",     type:"adj",  vi:"dữ dội",             meaning:"very strong or violent",                    example:"A ___ storm hit the coast last night." },
+    { word:"modest",     type:"adj",  vi:"khiêm tốn",          meaning:"not boasting about achievements",           example:"Despite winning, he remained very ___." },
+    { word:"crucial",    type:"adj",  vi:"quan trọng",         meaning:"extremely important",                       example:"Sleep is ___ for good health." },
+    { word:"subtle",     type:"adj",  vi:"tinh tế",            meaning:"not immediately obvious",                   example:"There was a ___ difference in their styles." },
+    { word:"dazzling",   type:"adj",  vi:"chói lọi",           meaning:"extremely bright or impressive",            example:"The performer gave a ___ display of skill." },
+    { word:"hollow",     type:"adj",  vi:"rỗng tuếch",         meaning:"having an empty space inside; insincere",   example:"The victory felt ___ after he cheated." },
+    { word:"gloomy",     type:"adj",  vi:"ảm đạm",             meaning:"dark or lacking light; depressing",         example:"The weather was ___ all weekend." },
+    // Verbs
+    { word:"thrive",     type:"verb", vi:"phát triển mạnh",    meaning:"to grow well; to be very successful",       example:"Plants ___ in warm, sunny conditions." },
+    { word:"vanish",     type:"verb", vi:"biến mất",           meaning:"to disappear suddenly",                     example:"The magician made the coin ___." },
+    { word:"rescue",     type:"verb", vi:"cứu thoát",          meaning:"to save from danger",                       example:"Firefighters ___ three people from the burning building." },
+    { word:"pursue",     type:"verb", vi:"theo đuổi",          meaning:"to follow or chase",                        example:"She decided to ___ a career in medicine." },
+    { word:"abandon",    type:"verb", vi:"từ bỏ",              meaning:"to leave completely; to give up",           example:"They had to ___ the ship during the storm." },
+    { word:"reveal",     type:"verb", vi:"tiết lộ",            meaning:"to make something known",                   example:"The detective finally ___ the truth." },
+    { word:"enhance",    type:"verb", vi:"nâng cao",           meaning:"to improve the quality of",                 example:"Exercise can greatly ___ your mood." },
+    { word:"collide",    type:"verb", vi:"va chạm",            meaning:"to crash into something",                   example:"Two trains ___ on the mountain track." },
+    { word:"inspire",    type:"verb", vi:"truyền cảm hứng",    meaning:"to fill someone with motivation",           example:"Her speech ___ many young students." },
+    { word:"exhaust",    type:"verb", vi:"kiệt sức",           meaning:"to make very tired; to use up completely",  example:"Running a marathon will ___ your energy." },
+    { word:"hesitate",   type:"verb", vi:"do dự",              meaning:"to pause before doing something",           example:"Don't ___ to ask for help." },
+    { word:"shatter",    type:"verb", vi:"vỡ tan",             meaning:"to break into many pieces suddenly",        example:"The glass ___ when it hit the floor." },
+    // Nouns
+    { word:"wisdom",     type:"noun", vi:"sự khôn ngoan",      meaning:"the ability to make good decisions",        example:"Elders are respected for their ___." },
+    { word:"chaos",      type:"noun", vi:"hỗn loạn",           meaning:"complete disorder and confusion",           example:"The power cut caused ___ at the airport." },
+    { word:"legend",     type:"noun", vi:"huyền thoại",        meaning:"a famous story from the past",              example:"King Arthur is a well-known ___." },
+    { word:"instinct",   type:"noun", vi:"bản năng",           meaning:"a natural ability or reaction",             example:"She followed her ___ and ran away." },
+    { word:"triumph",    type:"noun", vi:"chiến thắng",        meaning:"a great victory or achievement",            example:"Winning gold was the greatest ___ of his career." },
+    { word:"dilemma",    type:"noun", vi:"tình huống khó xử",  meaning:"a difficult choice between two options",    example:"Doctors often face a moral ___." },
+    { word:"horizon",    type:"noun", vi:"đường chân trời",    meaning:"the line where earth meets the sky",        example:"They watched the sun sink below the ___." },
+    { word:"obstacle",   type:"noun", vi:"chướng ngại vật",    meaning:"something that blocks progress",            example:"Fear can be the biggest ___ to success." },
+    { word:"solitude",   type:"noun", vi:"sự cô đơn",          meaning:"the state of being alone",                  example:"Writers often need ___ to concentrate." },
+    { word:"ambition",   type:"noun", vi:"tham vọng",          meaning:"a strong desire to achieve something",      example:"His ___ drove him to work 18 hours a day." },
+    { word:"burden",     type:"noun", vi:"gánh nặng",          meaning:"a heavy load or responsibility",            example:"Debt can be a huge ___ on a family." },
+    { word:"glory",      type:"noun", vi:"vinh quang",         meaning:"great honor and admiration",                example:"The team basked in the ___ of their win." },
+    // Adverbs
+    { word:"vaguely",       type:"adv", vi:"mơ hồ",            meaning:"in a way that is not clear",                example:"I ___ remember meeting her before." },
+    { word:"reluctantly",   type:"adv", vi:"miễn cưỡng",       meaning:"unwillingly; without enthusiasm",           example:"He ___ agreed to join the team." },
+    { word:"swiftly",       type:"adv", vi:"nhanh nhẹn",       meaning:"very quickly",                              example:"The horse ran ___ across the field." },
+    { word:"gradually",     type:"adv", vi:"dần dần",          meaning:"slowly, step by step",                      example:"Her confidence grew ___." },
+    // Boss words
+    { word:"perseverance",  type:"noun", vi:"sự kiên trì",     meaning:"continued effort despite difficulty",       example:"Success requires hard work and ___.", boss:true },
+    { word:"catastrophic",  type:"adj",  vi:"thảm họa",        meaning:"involving sudden great damage",             example:"The flood caused ___ damage to the city.", boss:true },
+    { word:"extraordinary", type:"adj",  vi:"phi thường",      meaning:"very unusual and surprising",               example:"She showed ___ courage under pressure.", boss:true },
+    { word:"magnificent",   type:"adj",  vi:"tráng lệ",        meaning:"impressively beautiful",                    example:"The ___ palace attracted millions of tourists.", boss:true },
+    { word:"vulnerability", type:"noun", vi:"sự dễ tổn thương",meaning:"the state of being exposed to harm",        example:"The report highlighted the ___ of coastal towns.", boss:true },
+    { word:"procrastinate", type:"verb", vi:"trì hoãn",        meaning:"to delay doing tasks",                      example:"Students often ___ before exam season.", boss:true },
+    { word:"sophisticated", type:"adj",  vi:"tinh vi",         meaning:"complex and refined",                       example:"The company uses very ___ technology.", boss:true },
+    { word:"determination", type:"noun", vi:"sự quyết tâm",    meaning:"firm decision to do something",             example:"Her ___ helped her win the race.", boss:true },
+  ];
+
+  // ──────────────────────────────────────────────────────────────
+  // State
+  // ──────────────────────────────────────────────────────────────
+  let gameMode   = 'classic';
+  let difficulty = 'easy';
+  let enemies    = [];
+  let score=0, level=1, health=100, speed=1.2, spawnRate=2800;
+  let combo=0, multiplier=1;
+  let gameActive = false;
+  let learnedWords = new Map(); // word -> vocab
+  let gameInterval, spawnInterval, comboTimeout, shakeTimer;
+
+  const diffSettings = {
+    easy:   { speed: 1.0, spawnRate: 3200, maxEnemies: 4 },
+    normal: { speed: 1.6, spawnRate: 2400, maxEnemies: 6 },
+    hard:   { speed: 2.4, spawnRate: 1600, maxEnemies: 8 },
+  };
+
+  function selectMode(el, mode) {
+    document.querySelectorAll('.mode-card').forEach(c=>c.classList.remove('selected'));
+    el.classList.add('selected'); gameMode = mode;
+  }
+  function selectDiff(el, d) {
+    document.querySelectorAll('.diff-btn').forEach(b=>b.classList.remove('active'));
+    el.classList.add('active'); difficulty = d;
+  }
+  function beginGame() {
+    const s = diffSettings[difficulty];
+    speed = s.speed; spawnRate = s.spawnRate;
+    document.getElementById('startScreen').style.display = 'none';
+    gameActive = true;
+    startGame();
+    input.focus();
+  }
+
+  // ──────────────────────────────────────────────────────────────
+  // Canvas / FX
+  // ──────────────────────────────────────────────────────────────
+  const game   = document.getElementById('game');
+  const canvas = document.getElementById('fxCanvas');
+  const ctx    = canvas.getContext('2d');
+  function resizeCanvas() { canvas.width=window.innerWidth; canvas.height=window.innerHeight; }
+  resizeCanvas(); window.addEventListener('resize', resizeCanvas);
+
+  const particles = [];
+  const COLORS_NORMAL = ['#00d4ff','#39ff14','#ffe600','#ff9933','#ffffff','#33cfff'];
+  const COLORS_BOSS   = ['#ff2d78','#ff33cc','#cc00ff','#ffffff','#ffaaff','#ff0099'];
+
+  function spawnFireworks(cx, cy, isBoss=false) {
+    const colors = isBoss ? COLORS_BOSS : COLORS_NORMAL;
+    const count  = isBoss ? 120 : 60;
+    for (let i=0; i<count; i++) {
+      const angle = (Math.PI*2/count)*i + (Math.random()-0.5)*0.5;
+      const spd   = (2+Math.random()*5)*(isBoss?1.4:1);
+      particles.push({
+        x:cx, y:cy, vx:Math.cos(angle)*spd, vy:Math.sin(angle)*spd,
+        color:colors[Math.floor(Math.random()*colors.length)],
+        size:(isBoss?2.5:1.8)+Math.random()*2,
+        life:(isBoss?55:38)+Math.random()*25, maxLife:isBoss?80:55,
+        gravity:0.12, delay:Math.floor(i/count*60), born:performance.now(), trail:[]
+      });
+    }
+    for (let i=0; i<(isBoss?20:8); i++) {
+      const angle=Math.random()*Math.PI*2, spd=Math.random()*(isBoss?3:2);
+      particles.push({
+        x:cx, y:cy, vx:Math.cos(angle)*spd, vy:Math.sin(angle)*spd,
+        color:'#ffffff', size:isBoss?3.5:2.5, life:15+Math.random()*12, maxLife:28,
+        gravity:0, delay:0, born:performance.now(), trail:[]
+      });
+    }
+  }
+
+  function updateAndDrawParticles() {
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    const now=performance.now();
+    for (let i=particles.length-1;i>=0;i--) {
+      const p=particles[i];
+      if (now-p.born < p.delay) continue;
+      if (p.trail) { p.trail.push({x:p.x,y:p.y}); if(p.trail.length>5) p.trail.shift(); }
+      p.x+=p.vx; p.y+=p.vy; p.vy+=p.gravity; p.vx*=0.975; p.life--;
+      if (p.life<=0) { particles.splice(i,1); continue; }
+      const alpha=p.life/p.maxLife;
+      if (p.trail&&p.trail.length>1) {
+        ctx.save(); ctx.strokeStyle=p.color; ctx.lineWidth=p.size*0.4;
+        ctx.globalAlpha=alpha*0.3; ctx.shadowColor=p.color; ctx.shadowBlur=4;
+        ctx.beginPath(); ctx.moveTo(p.trail[0].x,p.trail[0].y);
+        p.trail.slice(1).forEach(t=>ctx.lineTo(t.x,t.y)); ctx.stroke(); ctx.restore();
+      }
+      ctx.save(); ctx.globalAlpha=alpha; ctx.shadowColor=p.color; ctx.shadowBlur=12;
+      ctx.fillStyle=p.color; ctx.beginPath();
+      ctx.arc(p.x,p.y,Math.max(0.1,p.size*alpha),0,Math.PI*2); ctx.fill(); ctx.restore();
+    }
+  }
+
+  function fxLoop() { updateAndDrawParticles(); requestAnimationFrame(fxLoop); }
+  fxLoop();
+
+  function triggerShake(isBoss=false) {
+    game.classList.remove('screen-shake','screen-shake-boss');
+    void game.offsetWidth;
+    game.classList.add(isBoss?'screen-shake-boss':'screen-shake');
+    clearTimeout(shakeTimer);
+    shakeTimer=setTimeout(()=>game.classList.remove('screen-shake','screen-shake-boss'), isBoss?600:400);
+  }
+
+  // ──────────────────────────────────────────────────────────────
+  // Audio
+  // ──────────────────────────────────────────────────────────────
+  const audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+  function playExplosionSound(isBoss=false) {
+    try {
+      const dur=isBoss?1.4:0.6;
+      const buf=audioCtx.createBuffer(1,audioCtx.sampleRate*dur,audioCtx.sampleRate);
+      const data=buf.getChannelData(0); for(let i=0;i<data.length;i++) data[i]=Math.random()*2-1;
+      const noise=audioCtx.createBufferSource(); noise.buffer=buf;
+      const filt=audioCtx.createBiquadFilter(); filt.type='lowpass'; filt.frequency.value=isBoss?300:200;
+      const gain=audioCtx.createGain(); const now=audioCtx.currentTime;
+      gain.gain.setValueAtTime(0,now); gain.gain.linearRampToValueAtTime(isBoss?1:0.6,now+0.01);
+      gain.gain.exponentialRampToValueAtTime(0.001,now+dur);
+      noise.connect(filt); filt.connect(gain); gain.connect(audioCtx.destination);
+      noise.start(now); noise.stop(now+dur);
+      const osc=audioCtx.createOscillator(); const og=audioCtx.createGain();
+      osc.type='sine'; osc.frequency.setValueAtTime(isBoss?90:55,now);
+      osc.frequency.exponentialRampToValueAtTime(18,now+dur*0.5);
+      og.gain.setValueAtTime(isBoss?1.2:0.7,now); og.gain.exponentialRampToValueAtTime(0.001,now+dur*0.5);
+      osc.connect(og); og.connect(audioCtx.destination); osc.start(now); osc.stop(now+dur);
+    } catch(e){}
+  }
+  function playTypingSound() {
+    try {
+      const osc=audioCtx.createOscillator(); const g=audioCtx.createGain();
+      osc.type='square'; osc.frequency.value=600+Math.random()*200;
+      g.gain.setValueAtTime(0.05,audioCtx.currentTime); g.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+0.04);
+      osc.connect(g); g.connect(audioCtx.destination); osc.start(); osc.stop(audioCtx.currentTime+0.04);
+    } catch(e){}
+  }
+
+  // ──────────────────────────────────────────────────────────────
+  // Build enemy card
+  // ──────────────────────────────────────────────────────────────
+  function scramble(word) {
+    const a=word.split('');
+    for (let i=a.length-1;i>0;i--) { const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; }
+    return a.join('')===word&&word.length>1 ? scramble(word) : a.join('');
+  }
+
+  function buildDisplay(vocab) {
+    if (gameMode==='classic')    return { top: vocab.word.toUpperCase(),             sub: vocab.vi };
+    if (gameMode==='meaning')    return { top: vocab.meaning,                        sub: 'gõ từ tiếng Anh' };
+    if (gameMode==='vietnamese') return { top: vocab.vi,                             sub: 'type the English word' };
+    if (gameMode==='scramble')   return { top: scramble(vocab.word).toUpperCase(),   sub: vocab.vi };
+    return { top: vocab.word.toUpperCase(), sub: vocab.vi };
+  }
+
+  function spawnEnemy(vocab=null, isBoss=false) {
+    const diff = diffSettings[difficulty];
+    if (enemies.length >= diff.maxEnemies) return;
+
+    if (!vocab) {
+      const pool = VOCAB.filter(v=>!v.boss && !enemies.some(e=>e.vocab.word===v.word));
+      if (!pool.length) return;
+      vocab = pool[Math.floor(Math.random()*pool.length)];
+    }
+    if (enemies.some(e=>e.vocab.word===vocab.word)) return;
+
+    const { top, sub } = buildDisplay(vocab);
+    const badgeClass = isBoss ? 'badge-boss' : `badge-${vocab.type}`;
+    const badgeLabel = isBoss ? '⚡ BOSS' : vocab.type.toUpperCase();
+
+    const el = document.createElement('div');
+    el.classList.add('enemy', isBoss?'boss':'normal');
+    el.innerHTML = `
+      <div class="enemy-card">
+        <div class="enemy-word" id="ew-${vocab.word}">${top}</div>
+        <div class="enemy-vi">${gameMode==='classic' ? vocab.vi : ''}</div>
+        <div class="enemy-meaning">${sub}</div>
+        <span class="enemy-type-badge ${badgeClass}">${badgeLabel}</span>
+        <div class="hp-bar-wrap"><div class="hp-bar" style="width:100%"></div></div>
+      </div>`;
+
+    el.style.left = (20+Math.random()*(window.innerWidth-220)) + 'px';
+    el.style.top  = '-90px';
+    game.appendChild(el);
+    enemies.push({ el, vocab, y:-90, isBoss });
+  }
+
+  // ──────────────────────────────────────────────────────────────
+  // Update
+  // ──────────────────────────────────────────────────────────────
+  function updateEnemies() {
+    if (!gameActive) return;
+    for (let i=enemies.length-1;i>=0;i--) {
+      const e=enemies[i];
+      e.y += speed*(e.isBoss?0.6:1);
+      e.el.style.top=e.y+'px';
+      if (e.y > window.innerHeight-80) {
+        health-=e.isBoss?30:12;
+        updateHealth(); e.el.remove(); enemies.splice(i,1);
+        resetCombo(); if(health<=0) endGame();
+      }
+    }
+    highlightMatching();
+  }
+
+  function highlightMatching() {
+    const typed=input.value.trim().toLowerCase();
+    enemies.forEach(e=>{
+      const word=e.vocab.word;
+      const wEl=document.getElementById('ew-'+word);
+      if (!wEl) return;
+      if (gameMode==='classic'||gameMode==='scramble') {
+        if (typed&&word.startsWith(typed)) {
+          wEl.innerHTML=`<span class="typed-prefix">${word.slice(0,typed.length).toUpperCase()}</span>${word.slice(typed.length).toUpperCase()}`;
+        } else { wEl.textContent=word.toUpperCase(); }
+      }
+    });
+  }
+
+  // ──────────────────────────────────────────────────────────────
+  // Shoot & Destroy
+  // ──────────────────────────────────────────────────────────────
+  function shootBullet(enemyObj) {
+    const bullet=document.createElement('div'); bullet.classList.add('bullet');
+    const playerEl=document.getElementById('player');
+    bullet.style.left=(playerEl.offsetLeft+22)+'px'; bullet.style.top=playerEl.offsetTop+'px';
+    game.appendChild(bullet);
+    const ex=enemyObj.el.offsetLeft+enemyObj.el.offsetWidth/2, ey=enemyObj.y;
+    let by=playerEl.offsetTop;
+    const iv=setInterval(()=>{
+      by-=12; bullet.style.top=by+'px';
+      if (by<=ey+10||by<0) {
+        spawnFireworks(ex,ey,enemyObj.isBoss);
+        triggerShake(enemyObj.isBoss);
+        bullet.remove(); clearInterval(iv);
+      }
+    },16);
+  }
+
+  function spawnViPop(x, y, text) {
+    const el=document.createElement('div'); el.classList.add('vi-pop');
+    el.textContent='🇻🇳 '+text;
+    el.style.left=x+'px'; el.style.top=y+'px';
+    game.appendChild(el);
+    setTimeout(()=>el.remove(),1500);
+  }
+
+  function floatingScore(x, y, pts) {
+    const el=document.createElement('div'); el.classList.add('float-score');
+    el.style.left=x+'px'; el.style.top=y+'px';
+    el.style.color=multiplier>2?'#ffe600':'#39ff14';
+    el.textContent='+'+pts;
+    game.appendChild(el); setTimeout(()=>el.remove(),900);
+  }
+
+  // ─── Vietnamese toast ──────────────────────────────────────
+  let toastTimer=null;
+  function showWordToast(vocab) {
+    const toast=document.getElementById('wordLearnedToast');
+    const badgeColors={noun:'#00d4ff',verb:'#39ff14',adj:'#ffe600',adv:'#bf5fff'};
+    const bc=vocab.boss?'#ff2d78':(badgeColors[vocab.type]||'#fff');
+
+    document.getElementById('toastBadge').textContent   = vocab.type.toUpperCase();
+    document.getElementById('toastBadge').style.cssText = `background:rgba(255,255,255,0.05);color:${bc};border:1px solid ${bc}44;border-radius:20px;padding:2px 8px;font-size:9px;letter-spacing:1px;`;
+    document.getElementById('toastEn').textContent      = vocab.word;
+    document.getElementById('toastVi').textContent      = '🇻🇳  ' + vocab.vi;
+    document.getElementById('toastMeaning').textContent = vocab.meaning;
+
+    // Highlight the word in the example
+    const ex=vocab.example.replace(vocab.word, `<span class="highlight">${vocab.word}</span>`);
+    document.getElementById('toastExample').innerHTML   = '✏️ ' + ex;
+
+    toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer=setTimeout(()=>toast.classList.remove('show'), 3500);
+  }
+
+  // ──────────────────────────────────────────────────────────────
+  // Input
+  // ──────────────────────────────────────────────────────────────
+  const input=document.getElementById('playerInput');
+  input.addEventListener('input',()=>{
+    playTypingSound();
+    const typed=input.value.trim().toLowerCase();
+    const hasMatch=enemies.some(e=>e.vocab.word.startsWith(typed)&&typed.length>0);
+    input.classList.toggle('match',hasMatch&&typed.length>0);
+  });
+
+  input.addEventListener('keydown',function(e){
+    if (e.key!=='Enter'||!gameActive) return;
+    const typed=input.value.trim().toLowerCase();
+
+    for (let i=enemies.length-1;i>=0;i--) {
+      const eo=enemies[i];
+      if (eo.vocab.word===typed) {
+        shootBullet(eo);
+        playExplosionSound(eo.isBoss);
+        eo.el.classList.add('hit-flash');
+
+        // 🇻🇳 Vietnamese pop near enemy
+        const ex2=eo.el.offsetLeft+eo.el.offsetWidth/2 - 40;
+        const ey2=eo.y;
+        spawnViPop(ex2, ey2, eo.vocab.vi);
+
+        const captured=eo;
+        setTimeout(()=>{ if(captured.el.parentNode) captured.el.remove(); },160);
+        enemies.splice(i,1);
+
+        // Track + show toast
+        if (!learnedWords.has(eo.vocab.word)) {
+          learnedWords.set(eo.vocab.word, eo.vocab);
+        }
+        showWordToast(eo.vocab);
+
+        increaseCombo();
+        const base=eo.isBoss?60:15;
+        const pts=base*multiplier;
+        score+=pts;
+        floatingScore(eo.el.offsetLeft+40, eo.y, pts);
+        document.getElementById('scoreVal').textContent=score;
+        if (score>0 && score%200 < pts) levelUp();
+        break;
+      }
+    }
+    input.value=''; input.classList.remove('match');
+  });
+
+  // ──────────────────────────────────────────────────────────────
+  // Combo / Health / Level
+  // ──────────────────────────────────────────────────────────────
+  function increaseCombo() {
+    combo++; if(combo%5===0) multiplier=Math.min(multiplier+1,8);
+    document.getElementById('multVal').textContent=multiplier;
+    const ct=document.getElementById('comboText');
+    ct.textContent=combo>1?'COMBO ×'+combo+'!':'';
+    ct.style.opacity=combo>1?1:0;
+    clearTimeout(comboTimeout);
+    comboTimeout=setTimeout(()=>ct.style.opacity=0,900);
+  }
+  function resetCombo() { combo=0;multiplier=1;document.getElementById('multVal').textContent=1; }
+
+  function updateHealth() {
+    health=Math.max(0,health);
+    const fill=document.getElementById('healthFill');
+    fill.style.width=health+'%';
+    if (health<30) { fill.style.background='linear-gradient(90deg,#ff2d78,#ff6699)'; fill.style.boxShadow='0 0 8px rgba(255,45,120,0.7)'; }
+    else if (health<60) { fill.style.background='linear-gradient(90deg,#ffe600,#ff9933)'; fill.style.boxShadow='0 0 8px rgba(255,230,0,0.6)'; }
+  }
+
+  function levelUp() {
+    level++;
+    const d=diffSettings[difficulty];
+    speed=d.speed+(level-1)*0.35; spawnRate=Math.max(900,d.spawnRate-(level-1)*200);
+    document.getElementById('levelVal').textContent=level;
+    const banner=document.getElementById('levelUpBanner');
+    banner.textContent='LEVEL '+level; banner.style.opacity=1;
+    setTimeout(()=>banner.style.opacity=0,1400);
+    clearInterval(spawnInterval); spawnInterval=setInterval(trySpawn,spawnRate);
+    if (level%3===0) {
+      const bossPool=VOCAB.filter(v=>v.boss);
+      spawnEnemy(bossPool[Math.floor(Math.random()*bossPool.length)],true);
+    }
+  }
+
+  function trySpawn() {
+    if (!gameActive) return;
+    const onScreen=new Set(enemies.map(e=>e.vocab.word));
+    const pool=VOCAB.filter(v=>!v.boss&&!onScreen.has(v.word));
+    if (!pool.length) return;
+    spawnEnemy(pool[Math.floor(Math.random()*pool.length)],false);
+  }
+
+  // ──────────────────────────────────────────────────────────────
+  // End Game
+  // ──────────────────────────────────────────────────────────────
+  function endGame() {
+    gameActive=false; clearInterval(gameInterval); clearInterval(spawnInterval);
+    input.disabled=true;
+    const items=document.getElementById('learnedItems'); items.innerHTML='';
+    learnedWords.forEach((v,w)=>{
+      const d=document.createElement('div'); d.classList.add('learned-item');
+      d.innerHTML=`<span class="lw">${v.word}</span><span class="lv">${v.vi}</span><span class="lm">— ${v.meaning}</span>`;
+      items.appendChild(d);
+    });
+    document.getElementById('finalScore').textContent=
+      `Điểm: ${score}  ·  Level ${level}  ·  ${learnedWords.size} từ đã học`;
+    document.getElementById('gameOverScreen').style.display='flex';
+  }
+
+  // ──────────────────────────────────────────────────────────────
+  // Start
+  // ──────────────────────────────────────────────────────────────
+  function startGame() {
+    updateHealth(); trySpawn();
+    gameInterval =setInterval(updateEnemies,20);
+    spawnInterval=setInterval(trySpawn,spawnRate);
+  }
+  </script>
+</body>
+</html>

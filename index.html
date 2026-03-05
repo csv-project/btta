@@ -378,54 +378,54 @@
   <!-- START SCREEN -->
   <div id="startScreen" class="screen">
     <h1>WORDBLAST</h1>
-    <div class="tagline">Học tiếng Anh qua bắn súng · Master English Vocab</div>
+    <div class="tagline">Learn English through shooting. · Master English Vocab</div>
     <div class="mode-grid">
       <div class="mode-card selected" data-mode="classic" onclick="selectMode(this,'classic')">
         <div class="mode-icon">🚀</div>
         <div class="mode-name">Classic</div>
-        <div class="mode-desc">Gõ từ tiếng Anh trên màn hình để bắn.</div>
+        <div class="mode-desc">Type English words on the screen to shoot.</div>
       </div>
       <div class="mode-card" data-mode="meaning" onclick="selectMode(this,'meaning')">
         <div class="mode-icon">🧠</div>
         <div class="mode-name">Meaning Mode</div>
-        <div class="mode-desc">Thấy nghĩa tiếng Anh, gõ từ đúng để bắn.</div>
+        <div class="mode-desc">Seeing the English meaning, type the correct word to shoot.</div>
       </div>
       <div class="mode-card" data-mode="vietnamese" onclick="selectMode(this,'vietnamese')">
         <div class="mode-icon">🇻🇳</div>
-        <div class="mode-name">Tiếng Việt</div>
-        <div class="mode-desc">Thấy nghĩa tiếng Việt, gõ từ tiếng Anh.</div>
+        <div class="mode-name">VietNamese</div>
+        <div class="mode-desc">After seeing the Vietnamese meaning, type the corresponding English word.</div>
       </div>
       <div class="mode-card" data-mode="scramble" onclick="selectMode(this,'scramble')">
         <div class="mode-icon">🔀</div>
         <div class="mode-name">Scramble</div>
-        <div class="mode-desc">Chữ cái bị xáo trộn — unscramble để bắn!</div>
+        <div class="mode-desc">The letters are scrambled — rearrange them to shoot!</div>
       </div>
     </div>
     <div class="diff-row">
-      <button class="diff-btn active" onclick="selectDiff(this,'easy')">Dễ</button>
-      <button class="diff-btn" onclick="selectDiff(this,'normal')">Thường</button>
-      <button class="diff-btn" onclick="selectDiff(this,'hard')">Khó</button>
+      <button class="diff-btn active" onclick="selectDiff(this,'easy')">Easy</button>
+      <button class="diff-btn" onclick="selectDiff(this,'normal')">Normal</button>
+      <button class="diff-btn" onclick="selectDiff(this,'hard')">Hard</button>
     </div>
-    <button class="start-btn" onclick="beginGame()">PHÓNG  ▶</button>
+    <button class="start-btn" onclick="beginGame()">Start up!  ▶</button>
   </div>
 
   <!-- GAME OVER -->
   <div id="gameOverScreen" class="screen" style="display:none;">
     <h2>GAME OVER</h2>
     <div id="finalScore"></div>
-    <div id="learnedList"><h3>📚 Từ vựng đã học</h3><div id="learnedItems"></div></div>
-    <button class="start-btn" onclick="location.reload()">CHƠI LẠI</button>
+    <div id="learnedList"><h3>📚 learned vocabulary</h3><div id="learnedItems"></div></div>
+    <button class="start-btn" onclick="location.reload()">REPLAY</button>
   </div>
 
   <div id="game">
     <canvas id="fxCanvas"></canvas>
     <div id="hud">
       <div class="hud-block">
-        <span class="hud-label">Điểm</span>
+        <span class="hud-label">Score</span>
         <span class="hud-value" id="scoreVal">0</span>
       </div>
       <div id="healthBar">
-        <div class="health-label">SỨC KHỎE TÀU</div>
+        <div class="health-label">SHIP HEALTH</div>
         <div class="health-track"><div id="healthFill"></div></div>
       </div>
       <div class="hud-block">
@@ -437,9 +437,6 @@
         <span class="hud-value" id="multVal">1</span>
       </div>
     </div>
-
-    <div id="comboText"></div>
-    <div id="levelUpBanner"></div>
 
     <!-- Vietnamese toast popup -->
     <div id="wordLearnedToast">
